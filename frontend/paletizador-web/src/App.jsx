@@ -32,12 +32,14 @@ export default function App() {
   const [orderInfo, setOrderInfo] = useState({ po: "", piktik: "", company: "", custNo: "" });
   const [itemsForm, setItemsForm] = useState([{ width: 0, length: 0, height: 0, weight: 0, qty: 0, sku: "" }]);
 
-  // Asignación de color por SKU
+  // Asignar colores indexados únicos a cada fila del formulario
   const skuColorMap = useMemo(() => {
-    const uniqueSkus = Array.from(new Set(itemsForm.map((i) => i.sku?.trim() || "UNKNOWN")));
     const map = {};
-    uniqueSkus.forEach((sku, idx) => {
-      map[sku] = SKU_PALETTE[idx % SKU_PALETTE.length];
+    itemsForm.forEach((item, idx) => {
+      const cleanSku = item.sku?.trim() || `SKU-${idx + 1}`;
+      if (!map[cleanSku]) {
+        map[cleanSku] = SKU_PALETTE[Object.keys(map).length % SKU_PALETTE.length];
+      }
     });
     return map;
   }, [itemsForm]);
