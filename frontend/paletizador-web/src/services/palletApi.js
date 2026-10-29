@@ -1,4 +1,4 @@
-const BASE_URL = "http://127.0.0.1:8000/api";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
 
 export async function parsePdfTicket(file) {
   const formData = new FormData();
@@ -10,20 +10,42 @@ export async function parsePdfTicket(file) {
   });
 
   if (!response.ok) {
-    throw new Error("Error al analizar el PDF en el servidor.");
+    let errorDetail = "Error analizando el PDF.";
+    try {
+      const err = await response.json();
+      errorDetail = err.detail || errorDetail;
+    } catch (_) {}
+    throw new Error(errorDetail);
   }
   return await response.json();
 }
 
 export async function packOrder(payload) {
-  const response = await fetch(`${BASE_URL}/pack`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  let response;
+  try {
+    response = await fetch(`${BASE_URL}/pack`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (netErr) {
+    throw new Error("No se pudo conectar con el servidor backend (revisa que Uvicorn esté activo).");
+  }
 
   if (!response.ok) {
-    throw new Error("Error al calcular el empaque de pallets.");
+    let errorDetail = "Error del motor de optimización.";
+    try {
+      const err = await response.json();
+      errorDetail = err.detail || JSON.stringify(err);
+    } catch (_) {
+      errorDetail = await response.text();
+    }
+    throw new Error(errorDetail);
   }
-  return await response.json();
+
+  const data = await response.json();
+  if (!data) {
+    throw new Error("El motor backend devolvió una respuesta vacía (null).");
+  }
+  return data;
 }

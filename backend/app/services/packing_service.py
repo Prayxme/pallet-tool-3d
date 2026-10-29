@@ -39,7 +39,6 @@ def optimizar_orden_pallets(request: PackingRequest) -> Dict[str, Any]:
         test_packer.pack()
 
         test_bin = test_packer.bins[0]
-        # Aplicar gravedad restringida a la altura neta permitida
         aplicar_gravedad(test_bin.items, max_h_util=net_height)
         capacidad_pallet = len(test_bin.items)
 
@@ -48,17 +47,14 @@ def optimizar_orden_pallets(request: PackingRequest) -> Dict[str, Any]:
             pallets_completos = item.quantity // capacidad_pallet
             remanente = item.quantity % capacidad_pallet
 
-            # Construir plantilla del pallet homogéneo
             plantilla_dict = construir_pallet_dict(test_bin, config, "PALLET-TEMP")
             
-            # Clonar los pallets idénticos en milisegundos
             for _ in range(pallets_completos):
                 p_copy = copy.deepcopy(plantilla_dict)
                 p_copy["pallet_id"] = f"PALLET-{pallet_counter}"
                 response_pallets.append(p_copy)
                 pallet_counter += 1
 
-            # Las cajas sobrantes van al pool de empaque mixto
             for rem_idx in range(remanente):
                 pool_mixto.append({
                     "sku": item.sku,
@@ -69,7 +65,6 @@ def optimizar_orden_pallets(request: PackingRequest) -> Dict[str, Any]:
                     "name": f"{item.sku}###REM_{rem_idx}"
                 })
         else:
-            # Si el SKU no alcanza a llenar ni un pallet completo, va al pool mixto
             for rem_idx in range(item.quantity):
                 pool_mixto.append({
                     "sku": item.sku,
@@ -86,7 +81,6 @@ def optimizar_orden_pallets(request: PackingRequest) -> Dict[str, Any]:
     if pool_mixto:
         mixed_packer = Packer()
         
-        # Calcular dinámicamente cuántas posiciones de pallet mixto habilitar
         vol_cajas_mixtas = sum(c["w"] * c["h"] * c["d"] for c in pool_mixto)
         vol_pallet = config.width_in * config.length_in * net_height
         bins_necesarios = max(5, int((vol_cajas_mixtas / (vol_pallet * 0.65))) + 2)
@@ -100,7 +94,6 @@ def optimizar_orden_pallets(request: PackingRequest) -> Dict[str, Any]:
                 config.max_weight_lbs
             ))
         
-        # Ordenar residuo por peso de mayor a menor para garantizar estabilidad física
         pool_mixto.sort(key=lambda x: x["weight"], reverse=True)
         for c in pool_mixto:
             mixed_packer.add_item(Item(c["name"], c["w"], c["h"], c["d"], c["weight"]))
@@ -109,7 +102,14 @@ def optimizar_orden_pallets(request: PackingRequest) -> Dict[str, Any]:
 
         for mb in mixed_packer.bins:
             if mb.items:
-                # Gravedad y validación estricta de altura
                 aplicar_gravedad(mb.items, max_h_util=net_height)
-                
-                # Solo guardar si quedaron
+                if mb.items:
+                    pallet_dict = construir_pallet_dict(mb, config, f"PALLET-{pallet_counter}")
+                    response_pallets.append(pallet_dict)
+                    pallet_counter += 1
+
+    return {
+        "order_id": request.order_id,
+        "pallets": response_pallets,
+        "unplaced_boxes": 0
+    }

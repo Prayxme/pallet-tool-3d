@@ -118,14 +118,14 @@ export default function App() {
 
     try {
       const data = await packOrder(payload);
-      if (data.pallets && data.pallets.length > 0) {
+      if (data && data.pallets && data.pallets.length > 0) {
         setGruposPallets(agruparPallets(data.pallets));
         setGrupoSeleccionadoIdx(0);
       } else {
-        alert(lang === "es" ? "Error de empaque." : "Packing error.");
+        alert(lang === "es" ? "No se pudieron generar pallets con estos parámetros." : "No pallets generated with these parameters.");
       }
     } catch (error) {
-      alert(lang === "es" ? "Error de conexión." : "Connection error.");
+      alert(`${lang === "es" ? "Error:" : "Error:"} ${error.message}`);
     } finally {
       setLoading(false);
     }
